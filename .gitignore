@@ -1,0 +1,13 @@
+# Dependency directories
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+
+# Local environment variables
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db

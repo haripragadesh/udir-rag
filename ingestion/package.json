@@ -1,0 +1,17 @@
+{
+  "name": "udir-rag-ingestion",
+  "version": "1.0.0",
+  "description": "Ingestion script for UDIR RAG app",
+  "main": "ingest.ts",
+  "scripts": {
+    "ingest": "tsx ingest.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}

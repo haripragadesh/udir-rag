@@ -1,0 +1,24 @@
+name = "udir-rag-backend"
+main = "src/index.ts"
+compatibility_date = "2024-08-21"
+
+# Environment Variables
+[vars]
+# GEMINI_API_KEY can be set here for dev, or as a secret in production
+# INGEST_SECRET can be set here for dev, or as a secret in production
+INGEST_SECRET = "dev-secret-token"
+
+# Cloudflare D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "udir_rag_db"
+database_id = "local-d1-db"
+
+# Cloudflare Vectorize Index binding
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "udir_rag_vectors"
+
+# Cloudflare Workers AI binding
+[ai]
+binding = "AI"

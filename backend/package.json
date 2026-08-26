@@ -1,0 +1,19 @@
+{
+  "name": "udir-rag-backend",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker Backend for UDIR RAG",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "^4.5.11"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240821.0",
+    "typescript": "^5.5.4",
+    "wrangler": "^3.72.0"
+  }
+}

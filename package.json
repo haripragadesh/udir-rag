@@ -1,0 +1,17 @@
+{
+  "name": "udir-rag-monorepo",
+  "version": "1.0.0",
+  "description": "Production-ready UDIR RAG web application on Cloudflare",
+  "scripts": {
+    "dev:backend": "cp -f .env backend/.dev.vars && npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "ingest": "npm --prefix ingestion run ingest",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "concurrently": "^8.2.2",
+    "dotenv": "^17.4.2"
+  }
+}
