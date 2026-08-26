@@ -1,17 +1,15 @@
-name: Deploy Worker Backend
+name: Deploy & Ingest
 
 on:
   push:
     branches:
       - main
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy.yml'
 
 jobs:
-  deploy:
+  # ─── Job 1: Deploy backend Worker whenever backend code changes ─────────────
+  deploy-backend:
     runs-on: ubuntu-latest
-    name: Deploy Worker to Cloudflare
+    name: Deploy Backend Worker
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -19,16 +17,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-size: 20
+          node-version: 20
 
-      - name: Install Monorepo Dependencies
-        run: |
-          npm install
-          npm --prefix backend install
-
-      - name: Build Worker Backend
-        run: |
-          npm --prefix backend run build
+      - name: Install Backend Dependencies
+        run: npm --prefix backend install
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
@@ -36,3 +28,60 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
+
+  # ─── Job 2: Deploy frontend whenever frontend code changes ───────────────────
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    name: Deploy Frontend to Cloudflare Pages
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install & Build Frontend
+        run: |
+          npm --prefix frontend install
+          npm --prefix frontend run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy frontend/dist --project-name udir-rag-frontend
+
+  # ─── Job 3: Re-ingest ONLY when documents or chunking logic changes ──────────
+  auto-ingest:
+    runs-on: ubuntu-latest
+    name: Auto Re-ingest Documents
+    needs: [deploy-backend]
+    # Only runs when source documents or the ingestion parser changes
+    if: |
+      contains(toJson(github.event.commits.*.modified), '"documents/') ||
+      contains(toJson(github.event.commits.*.added), '"documents/') ||
+      contains(toJson(github.event.commits.*.modified), '"ingestion/') ||
+      contains(toJson(github.event.commits.*.added), '"ingestion/')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Ingestion Dependencies
+        run: npm --prefix ingestion install
+
+      - name: Wait for Worker to be ready (15s after deploy)
+        run: sleep 15
+
+      - name: Run Ingestion Against Production
+        env:
+          BACKEND_URL: https://udir-rag-backend.hpden.workers.dev
+          INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+        run: npm --prefix ingestion run ingest
