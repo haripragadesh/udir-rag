@@ -38,8 +38,30 @@ function parseMarkdown(filePath: string, docName: string): Chunk[] {
     // Skip Table of Contents pages to prevent keyword search pollution
     if (
       (docName === 'upi_udir' && currentPage >= 2 && currentPage <= 5) ||
-      (docName === 'upi_osg' && currentPage >= 5 && currentPage <= 8)
+      (docName === 'upi_osg' && currentPage >= 1 && currentPage <= 8)
     ) {
+      accumulatedLines = [];
+      return;
+    }
+
+    // Skip chunks that are predominantly image placeholders (image-only chunks)
+    const imageTagCount = (text.match(/\[IMAGE_\d+\]/g) || []).length;
+    const textWithoutImages = text.replace(/\[IMAGE_\d+\][^\n]*/g, '').trim();
+    if (imageTagCount > 0 && textWithoutImages.length < 80) {
+      accumulatedLines = [];
+      return; // Skip image-only chunks
+    }
+
+    // Skip chunks that look like TOC entries (dotted lines: "Section ...... 22")
+    const lines = text.split('\n').filter(l => l.trim());
+    const dotLineCount = lines.filter(l => /\.{3,}\s*\d+/.test(l)).length;
+    if (lines.length > 0 && dotLineCount / lines.length > 0.5) {
+      accumulatedLines = [];
+      return; // Skip TOC dot-leader pages
+    }
+
+    // Skip very short chunks (less than 80 chars of actual content)
+    if (textWithoutImages.length < 80) {
       accumulatedLines = [];
       return;
     }

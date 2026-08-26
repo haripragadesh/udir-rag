@@ -266,13 +266,28 @@ app.get('/api/status', async (c) => {
 });
 
 const STOP_WORDS = new Set([
-  'what', 'are', 'the', 'for', 'when', 'it', 'under', 'a', 'in', 'of', 'and', 
-  'is', 'to', 'with', 'by', 'on', 'this', 'that', 'these', 'those', 'who', 
-  'how', 'why', 'where', 'there', 'here', 'which', 'about', 'an', 'at', 'or', 
-  'from', 'but', 'not', 'be', 'has', 'have', 'do', 'does', 'did', 'doing', 
-  'was', 'were', 'been', 'would', 'should', 'could', 'will', 'can', 'about',
-  'any', 'both', 'under', 'than', 'between', 'per', 'after'
+  // Articles, prepositions, conjunctions
+  'a', 'an', 'the', 'in', 'of', 'and', 'is', 'to', 'with', 'by', 'on',
+  'at', 'or', 'from', 'but', 'not', 'be', 'any', 'both', 'than', 'between',
+  'per', 'after', 'under', 'about', 'for', 'it', 'this', 'that', 'these',
+  'those', 'there', 'here', 'which',
+  // Pronouns
+  'who', 'how', 'why', 'where', 'what', 'when', 'me', 'my', 'we', 'us',
+  'you', 'your', 'they', 'them', 'their', 'he', 'she', 'his', 'her', 'its',
+  // Auxiliaries
+  'are', 'was', 'were', 'been', 'has', 'have', 'had', 'do', 'does', 'did',
+  'doing', 'would', 'should', 'could', 'will', 'can', 'may', 'might', 'shall',
+  // Conversational filler words (critical — these pollute FTS queries)
+  'tell', 'show', 'give', 'explain', 'describe', 'help', 'want', 'know',
+  'look', 'like', 'please', 'need', 'get', 'find', 'see', 'go', 'make',
+  'take', 'work', 'use', 'just', 'also', 'well', 'more', 'all', 'some',
+  'so', 'then', 'than', 'up', 'out', 'if', 'as', 'into', 'through',
 ]);
+
+// Detect if query is about disputes/complaints (to allow Complaint API chunks)
+function isComplaintQuery(message: string): boolean {
+  return /\b(complaint|dispute|chargeback|reversal|reject|udir|grievance|raise|refund|fail)\b/i.test(message);
+}
 
 function getCleanSearchQuery(message: string): string {
   let queryText = message;
@@ -288,7 +303,7 @@ function getCleanSearchQuery(message: string): string {
     .toLowerCase()
     .replace(/[^a-zA-Z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter(w => w.length > 1 && !STOP_WORDS.has(w));
+    .filter(w => w.length > 2 && !STOP_WORDS.has(w));
   return words.join(' OR ');
 }
 
@@ -335,14 +350,25 @@ app.post('/api/chat', async (c) => {
   const ftsQuery = getCleanSearchQuery(message);
   let keywordResults: any[] = [];
 
+  const isComplaint = isComplaintQuery(message);
+
   if (ftsQuery) {
-    console.log(`FTS5 Keyword Query: "${ftsQuery}"`);
+    console.log(`FTS5 Keyword Query: "${ftsQuery}" [isComplaintQuery=${isComplaint}]`);
     let ftsSql = `
       SELECT chunks.id, bm25(chunks_fts) as rank
       FROM chunks_fts
       JOIN chunks ON chunks.id = chunks_fts.rowid
       WHERE chunks_fts MATCH ?
+      AND LENGTH(chunks.content) > 120
     `;
+    // Exclude pure image-placeholder chunks (content is almost entirely image tags)
+    ftsSql += ` AND chunks.content NOT GLOB '*[IMAGE_*]*' OR LENGTH(REPLACE(chunks.content, ' ', '')) > 80`;
+
+    // Exclude Complaint API Sample Message Dump chunks for non-complaint queries
+    if (!isComplaint) {
+      ftsSql += ` AND chunks.section_hierarchy NOT LIKE '%Complaint API Sample Message Dumps%'`;
+    }
+
     const params: any[] = [ftsQuery];
     if (document_filter !== 'both') {
       ftsSql += ' AND chunks.document_name = ?';
