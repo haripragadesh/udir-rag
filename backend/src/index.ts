@@ -361,8 +361,6 @@ app.post('/api/chat', async (c) => {
       WHERE chunks_fts MATCH ?
       AND LENGTH(chunks.content) > 120
     `;
-    // Exclude pure image-placeholder chunks (content is almost entirely image tags)
-    ftsSql += ` AND chunks.content NOT GLOB '*[IMAGE_*]*' OR LENGTH(REPLACE(chunks.content, ' ', '')) > 80`;
 
     // Exclude Complaint API Sample Message Dump chunks for non-complaint queries
     if (!isComplaint) {
@@ -403,10 +401,10 @@ app.post('/api/chat', async (c) => {
     }
   });
 
-  // Fetch top 8 chunks
+  // Fetch top 5 chunks (reduced from 8 to keep context within token limits)
   const rankedIds = Array.from(rrfMap.values())
     .sort((a, b) => b.score - a.score)
-    .slice(0, 8)
+    .slice(0, 5)
     .map(x => x.id);
 
   console.log(`Top ranked chunk IDs: ${rankedIds.join(', ')}`);
@@ -449,19 +447,23 @@ app.post('/api/chat', async (c) => {
     });
   }
 
-  // Step F: Formulate LLM Prompt
-  const contextString = contexts.map((ctx, idx) => {
+  // Truncate contextString to max 8000 chars to stay within Gemini's token limit
+  const MAX_CONTEXT_CHARS = 8000;
+  let contextString = contexts.map((ctx, idx) => {
     return `[Source ID: ${idx + 1}]
 Document: ${ctx.document_name}
 Page: ${ctx.page_number}
 Section: ${ctx.section_hierarchy}
-Associated Image IDs: ${ctx.image_ids.length > 0 ? ctx.image_ids.join(', ') : 'None'}
 Content:
 ${ctx.content}
 ----------------------------------------`;
   }).join('\n\n');
 
-  console.log(`Context matches size: ${contextString.length} chars`);
+  if (contextString.length > MAX_CONTEXT_CHARS) {
+    contextString = contextString.slice(0, MAX_CONTEXT_CHARS) + '\n[...context truncated for token limit...]';
+  }
+
+  console.log(`Context matches size: ${contextString.length} chars (capped at ${MAX_CONTEXT_CHARS})`);
 
   const systemInstruction = `You are a helpful, expert RAG assistant for UPI clearing, settlement, and UDIR (dispute resolution) protocols.
 You will answer the user's questions based ONLY on the provided Context.
@@ -516,7 +518,9 @@ Question: ${message}`;
       );
 
       if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.statusText}`);
+        const errBody = await response.text();
+        console.error(`Gemini API error ${response.status}: ${errBody}`);
+        throw new Error(`Gemini API error ${response.status}: ${errBody.slice(0, 200)}`);
       }
 
       const { readable, writable } = new TransformStream();
