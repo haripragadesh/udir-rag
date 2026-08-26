@@ -99,6 +99,38 @@ async function getEmbedding(text: string, env: Bindings): Promise<{ values: numb
 }
 
 // ----------------------------------------------------
+// 0. LLM Diagnostic Test Endpoint
+// ----------------------------------------------------
+app.get('/api/test-llm', async (c) => {
+  const apiKey = c.env.GEMINI_API_KEY === 'your_google_gemini_api_key_here' ? undefined : c.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return c.json({ error: 'GEMINI_API_KEY not configured', hasKey: false });
+  }
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'Reply with: OK' }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 10 },
+        }),
+      }
+    );
+    const body = await response.json() as any;
+    if (!response.ok) {
+      return c.json({ error: 'Gemini API error', status: response.status, body });
+    }
+    const text = body.candidates?.[0]?.content?.parts?.[0]?.text || '(empty)';
+    return c.json({ success: true, geminiResponse: text, status: response.status });
+  } catch (e: any) {
+    return c.json({ error: 'Fetch failed', message: e.message });
+  }
+});
+
+// ----------------------------------------------------
 // 1. Database Index & Reset Endpoint
 // ----------------------------------------------------
 app.post('/api/ingest/reset', async (c) => {
@@ -496,7 +528,7 @@ Question: ${message}`;
     console.log('Using Google Gemini API for streaming reasoning...');
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
