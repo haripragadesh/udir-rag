@@ -433,10 +433,10 @@ app.post('/api/chat', async (c) => {
     }
   });
 
-  // Fetch top 5 chunks (reduced from 8 to keep context within token limits)
+  // Fetch top 8 chunks (context is capped at 16000 chars to stay within token limits)
   const rankedIds = Array.from(rrfMap.values())
     .sort((a, b) => b.score - a.score)
-    .slice(0, 5)
+    .slice(0, 8)
     .map(x => x.id);
 
   console.log(`Top ranked chunk IDs: ${rankedIds.join(', ')}`);
@@ -479,8 +479,8 @@ app.post('/api/chat', async (c) => {
     });
   }
 
-  // Truncate contextString to max 8000 chars to stay within Gemini's token limit
-  const MAX_CONTEXT_CHARS = 8000;
+  // Truncate contextString to max 16000 chars to stay within Gemini's token limit
+  const MAX_CONTEXT_CHARS = 16000;
   let contextString = contexts.map((ctx, idx) => {
     return `[Source ID: ${idx + 1}]
 Document: ${ctx.document_name}
@@ -544,6 +544,7 @@ Question: ${message}`;
             },
             generationConfig: {
               temperature: 0.1,
+              maxOutputTokens: 4096,
             },
           }),
         }
