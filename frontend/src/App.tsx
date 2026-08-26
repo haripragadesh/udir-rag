@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 import { 
   Send, 
   RefreshCw, 
@@ -75,7 +77,7 @@ Select a document filter in the sidebar or ask questions about reason codes, tra
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch('/api/status');
+      const res = await fetch(`${BACKEND_URL}/api/status`);
       if (res.ok) {
         const data = await res.json();
         setDbStatus(data);
@@ -89,7 +91,7 @@ Select a document filter in the sidebar or ask questions about reason codes, tra
     if (!window.confirm("Are you sure you want to reset the D1 database schemas? All ingested data will be deleted.")) return;
     setIsResetting(true);
     try {
-      const res = await fetch('/api/ingest/reset', {
+      const res = await fetch(`${BACKEND_URL}/api/ingest/reset`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer dev-secret-token`
@@ -123,7 +125,7 @@ Select a document filter in the sidebar or ask questions about reason codes, tra
     setMessages(prev => [...prev, { role: 'assistant', content: '', sources: [] }]);
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
